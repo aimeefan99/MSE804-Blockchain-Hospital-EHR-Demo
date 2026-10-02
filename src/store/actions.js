@@ -8,7 +8,8 @@ export const logIn = ({commit}, account_payload) => {
     commit(types.LOGIN, account_payload)
     return new Promise(resolve => {
         setTimeout(() => {
-            localStorage.setItem('token', 'JWT')
+            // JWT issued by the auth server after the wallet signature was verified
+            localStorage.setItem('token', account_payload[3])
             commit(types.LOGIN_SUCCESS)
             resolve()
         }, 1000)

@@ -1,10 +1,9 @@
 <template>
   <div class="">
 
-  <input type="number" placeholder="your public Id" v-model="id">
-  <button @click="login">Log in</button>
+  <button @click="login">Connect MetaMask &amp; Sign in</button>
   <br>
-  <label>Account address: {{ isAddress }}</label>
+  <label v-if="address">Wallet address: {{ address }}</label>
   <br>
   <p class="error" v-if="error.state">{{ error.message}}</p>
   <router-link to="/register" v-if="!isLoggedIn">if you are not registered?</router-link>
@@ -19,67 +18,55 @@ export default {
         state: false,
         message: null
       },
-      id: null,
-      accounts: ''
+      address: null
     }
   },
   methods: {
     login() {
-      if(this.id < 0 || this.id > 9){
-        this.error.state = true
-        this.error.message = this.id + ' is not a number between (0 & 9)'
-      }else{
-        let address = this.accounts[this.id]
-        let role = null
-      let balance = null
-    this.$Hospital.signIn(address)
-    .then(response => { 
-      console.log('Registration response', response)
-      if (response == '1'){
-        this.$Hospital.role(address).then(response => { 
-          role = response 
-          this.$Hospital.balance(address).then(response => { 
-            balance = response.c[0]
-              this.$store.dispatch('logIn', [address, role, balance ])
-              .then(() => {
-                console.log(address , ' ', role, ' ', balance)
-                // update your state for the account id, number and role
-                  this.$router.push('/dashboard')
-              })
-            })
-          })
-        
-
-      }else {
-        this.error.state = true
-        this.error.message = 'You are not registered: click below'
-      }
+      this.error.state = false
+      let address = null
+      let token = null
+      let role = null
+      // 1. Connect the wallet: the address comes from MetaMask, not from user input
+      this.$Hospital.init()
+      .then(() => {
+        address = this.$Hospital.accounts()[0]
+        this.address = address
+        return this.$Hospital.signIn(address)
       })
-    .catch(err => { 
-      this.error.state = true
-      this.error.message = 'Ethereum is not working: check your oracle'
-    })
+      .then(response => {
+        if (response != '1') {
+          return Promise.reject(new Error('You are not registered: click below'))
+        }
+        // 2. Prove ownership of the address by signing a one-time message
+        return this.$Hospital.authenticate(address)
+      })
+      .then(result => {
+        token = result
+        return this.$Hospital.role(address)
+      })
+      .then(result => {
+        role = result
+        return this.$Hospital.balance(address)
+      })
+      .then(result => {
+        return this.$store.dispatch('logIn', [address, role, result.c[0], token])
+      })
+      .then(() => {
+        this.$router.push('/dashboard')
+      })
+      .catch(err => {
+        this.error.state = true
+        this.error.message = 'Login failed: ' + (err.message || err)
+      })
     }
-
-  }
-},
-beforeMount(){
-    this.$Hospital.init().then(() => {
-      this.accounts = this.$Hospital.accounts()
-    })
-},
+  },
 created() {
   this.$store.dispatch('logOut')
 },
 computed: {
     isLoggedIn() {
-      console.log(this.$store.getters.isLoggedIn)
       return this.$store.getters.isLoggedIn
-    },
-    isAddress() {
-      console.log(this.id)
-      var k = this.id
-      return this.accounts[k]
     }
   }
 }

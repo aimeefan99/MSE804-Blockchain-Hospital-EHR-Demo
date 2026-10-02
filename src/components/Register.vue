@@ -2,9 +2,14 @@
   <div class="">
 <h4>Register here</h4>
 <br>
-<input type="number" placeholder="select public id" v-model="id">
+<label v-if="address">Wallet address: {{ address }}</label>
 <br>
-<input type="text" placeholder="Role: doctor, patients, pharmacy, insurance" v-model="role">
+<select v-model="role">
+  <option disabled value="">Select role</option>
+  <option value="Doctor">Doctor</option>
+  <option value="Patient">Patient</option>
+  <option value="Pharmacy">Pharmacy</option>
+</select>
 <br>
 <button @click="register" v-if="isPossible">Register</button>
 <p class="error" v-if="error.state">{{ error.message }}</p>
@@ -17,44 +22,35 @@
 export default {
   data() {
     return {
-      id: null,
-      role: null,
+      role: '',
       error: {
         state: false,
         message: ''
       },
-      accounts: null
+      address: null
     }
   },
   methods: {
     register() {
-      if(this.id < 0 || this.id > 9){
+      this.error.state = false
+      let address = null
+      // Register the wallet the user controls in MetaMask, not an account picked by number
+      this.$Hospital.init()
+      .then(() => {
+        address = this.$Hospital.accounts()[0]
+        this.address = address
+        return this.$Hospital.register(address, this.role)
+      })
+      .then(response => {
         this.error.state = true
-        this.error.message = this.id + ' is not a number between (0 & 9)'
-      }else{
-        let address = this.accounts[this.id]
-        this.$Hospital.register(address, this.role)
-        .then(response => {
-          console.log('Registration successful', response.tx)
-          this.error.state = true
-          this.error.message = 'Registration successful: '+ response.tx
-            this.$Hospital.balance(address).then(response => { 
-                let balance = response.c[0]
-                    this.$Hospital.add(address, this.role).then(respond => {
-                      this.error.message = 'Registered in Hyperledger'
-                          this.$store.dispatch('logIn', [address, this.role, balance ])
-                            .then(() => {
-                                console.log(address , ' ', this.role, ' ', balance)
-                                this.$router.push('/dashboard')
-                            })
-                    })
-            })
-        })
-        .catch(err => { 
-          this.error.state = true
-          this.error.message = 'Registration not succesful, click below'
-        })
-    }
+        this.error.message = 'Registration successful: ' + response.tx + ' Please log in.'
+        // Also register in Hyperledger; ignored when the Composer backend is offline
+        this.$Hospital.add(address, this.role).catch(() => {})
+      })
+      .catch(err => {
+        this.error.state = true
+        this.error.message = 'Registration not successful: ' + (err.message || err)
+      })
     }
   },
   computed: {
@@ -70,14 +66,6 @@ export default {
         return false
       }
     }
-  },
-  created(){
-      if(this.$Hospital.accounts() == null){
-        this.$router.replace('/')
-      }
-      else{
-        this.accounts = this.$Hospital.accounts()
-      }
   }
 }
 </script>

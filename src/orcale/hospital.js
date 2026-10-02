@@ -15,37 +15,65 @@ const Hospital = {
 
     init: () => {
         let self = this;
-        self.web3Provider =  new Web3.providers.HttpProvider('http://localhost:8545');
+        if (!window.ethereum) {
+            return Promise.reject(new Error('MetaMask is not installed'));
+        }
+        // Route every call through MetaMask, so transactions are signed by the user's own wallet
+        // instead of by unlocked accounts on the node
+        self.web3Provider = {
+            sendAsync: (payload, callback) => {
+                window.ethereum.request({ method: payload.method, params: payload.params })
+                .then(result => callback(null, { id: payload.id, jsonrpc: '2.0', result: result }))
+                .catch(error => callback(error))
+            }
+        };
         self.web3 = new Web3(self.web3Provider);
-            self.web3.version.getNetwork((error, netId) => {
-                if(error){
-                  console.log(err, 'First');
-                  return;
+        // Only the account the user approves in MetaMask is exposed to the page
+        let accounts = null;
+        return window.ethereum.request({ method: 'eth_requestAccounts' })
+        .then(result => {
+            accounts = result;
+            // Make sure this site uses the local Ganache chain (chain ID 1337 = 0x539)
+            return window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x539' }] })
+            .catch(error => {
+                // 4902: MetaMask does not know this chain yet, so ask to add it (MetaMask then switches to it)
+                if (error.code === 4902 || /Unrecognized chain/i.test(error.message)) {
+                    return window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [{
+                            chainId: '0x539',
+                            chainName: 'Ganache',
+                            rpcUrls: ['http://127.0.0.1:8545'],
+                            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }
+                        }]
+                    });
                 }
-                self.web3 = new Web3(self.web3Provider);
-                self.accounts = self.web3.eth.accounts;
-                console.log('My man: This is an unknown network.', netId);
-                return self.web3;
-                return self.accounts;
-              });
-        return new Promise((resolve, reject) =>{
+                throw error;
+            });
+        })
+        .then(() => {
+            self.accounts = accounts;
             self.contract = TruffleContract(HospitalJson);
             self.contract.setProvider(self.web3Provider);
-            self.contract.deployed().then(instance => {
-                // return instance;
-                self.instance = instance
-                return instance
-            })
-            .then((result) => {
-                self.instance = result;
-                self.baseUrl = 'http://localhost:3000/api/'
-                self.baseOrg = 'org.acme.hospital.'
-                resolve(result);
-            }).catch((err) => {
-                console.log('It is not working ', err.message);
-                reject(err)
-            })
+            return self.contract.deployed();
+        })
+        .then(instance => {
+            self.instance = instance;
+            self.baseUrl = 'http://localhost:3000/api/'
+            self.baseOrg = 'org.acme.hospital.'
+            return instance;
         });
+    },
+
+    // Wallet-signature login: sign a one-time message, the auth server verifies it and issues a JWT
+    authenticate: (address) => {
+        return axios.get('http://localhost:4001/nonce', { params: { address: address } })
+        .then(response => window.ethereum.request({
+            method: 'personal_sign',
+            params: [response.data.message, address]
+        }))
+        .then(signature => axios.post('http://localhost:4001/verify', { address: address, signature: signature }))
+        .then(response => response.data.token);
     },
 
     accounts: () => {
