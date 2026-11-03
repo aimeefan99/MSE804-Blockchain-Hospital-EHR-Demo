@@ -8,18 +8,18 @@ An interoperable, blockchain-based Electronic Health Record (EHR) management sys
 
 The application comprises three core components:
 
-1. **Ethereum Smart Contracts ()**:
-   - Written in Solidity  and deployed via Truffle.
+1. **Ethereum Smart Contracts (`contracts/Hospital.sol`)**:
+   - Written in Solidity `0.4.17` and deployed via Truffle.
    - **Entity Registration**: Registers participants (Patients, Doctors, Pharmacies, Insurance) on-chain.
-   - **Access Control**: Implements patient-controlled access permissions (, , , ).
-   - **On-Chain Billing**: Manages participant balances and transfers payments for medical services ().
+   - **Access Control**: Implements patient-controlled access permissions (`grantAccess`, `revokeAccess`, `didIGaveRights`, `doIHaveRights`).
+   - **On-Chain Billing**: Manages participant balances and transfers payments for medical services (`sendPayment`).
 
-2. **Wallet Authentication Server ()**:
+2. **Wallet Authentication Server (`auth-server/index.js`)**:
    - Express.js backend providing challenge-response cryptographic login.
-   - Generates single-use nonces per wallet address and verifies EIP-191 signatures using .
+   - Generates single-use nonces per wallet address and verifies EIP-191 signatures using `ethers.js`.
    - Issues short-lived JSON Web Tokens (JWT) for authenticated API access.
 
-3. **Vue.js Frontend Client ( & )**:
+3. **Vue.js Frontend Client (`src/` & `webpack.config.js`)**:
    - Single Page Application built with Vue 2, Vue Router, and Vuex.
    - **Login & Registration**: Web3 / MetaMask wallet integration and role registration.
    - **Dashboard**:
@@ -31,7 +31,20 @@ The application comprises three core components:
 
 ## Directory Structure
 
-
+```text
+hospital-ehr-Demo-Group2/
+├── auth-server/          # Node.js + Express wallet signature & JWT auth server
+├── contracts/            # Solidity smart contracts (Hospital.sol, Migrations.sol)
+├── hospital-ehr/         # Hyperledger Composer business network & scripts
+├── migrations/           # Truffle deployment migration scripts
+├── src/                  # Vue.js frontend application
+│   ├── components/       # UI views (Login, Register, Dashboard, Medical panels)
+│   ├── router/           # Vue Router navigation definitions
+│   └── store/            # Vuex state management
+├── truffle-config.js     # Truffle network configuration (Ganache / Local EVM)
+├── truffle.js            # Alternative Truffle configuration
+└── webpack.config.js     # Webpack bundler & dev server configuration
+```
 
 ---
 
@@ -39,36 +52,42 @@ The application comprises three core components:
 
 ### Prerequisites
 
-- **Node.js** (v14 or compatible) & **npm**
-- **Truffle Suite**: 
-- **Ganache**: Local Ethereum blockchain instance (running on port  or )
-- **MetaMask**: Browser extension configured to connect to your local Ganache RPC network.
+- **Node.js** (v14 or later) & **npm**
+- **Truffle Suite**: `npm install -g truffle`
+- **Ganache**: `npm install -g ganache` (or Ganache GUI)
+- **MetaMask**: Browser extension connected to local Ganache RPC network (`http://127.0.0.1:8545`).
 
 ---
 
 ### Installation & Local Setup
 
 1. **Install Dependencies**:
-   
+   ```bash
+   npm install
+   ```
 
 2. **Start Local Blockchain (Ganache)**:
-   Launch Ganache on  (Chain ID  or default).
+   ```bash
+   ganache --port 8545 --networkId 1337
+   ```
 
 3. **Compile & Deploy Smart Contracts**:
-   Could not find suitable configuration file.
-Truffle v5.11.5 (core: 5.11.5)
-Node v20.20.2
-Could not find suitable configuration file.
-Truffle v5.11.5 (core: 5.11.5)
-Node v20.20.2
+   ```bash
+   truffle compile
+   truffle migrate --reset
+   ```
 
 4. **Start Wallet Authentication Server**:
-   
-   The authentication server will start on .
+   ```bash
+   npm run auth
+   ```
+   The authentication server will start on `http://localhost:4001`.
 
 5. **Start Frontend Development Server**:
-   
-   Open  in your browser.
+   ```bash
+   npm run dev
+   ```
+   Open `http://localhost:8080` in your browser.
 
 ---
 
